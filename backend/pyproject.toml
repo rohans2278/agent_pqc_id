@@ -1,0 +1,27 @@
+[project]
+name = "pqc-agent-id-backend"
+version = "0.1.0"
+requires-python = ">=3.11"
+dependencies = [
+    "fastapi",
+    "uvicorn[standard]",
+    "sqlalchemy>=2.0",
+    "psycopg2-binary",
+    "pydantic-settings",
+    "boto3",
+    "cryptography",
+    "mcp",
+    "langgraph",
+    "langchain-google-genai",
+    "langchain-mcp-adapters",
+]
+
+# liboqs / the `oqs` Python wrapper is NOT listed here — it needs the liboqs C
+# library compiled first, which the Dockerfile handles before anything runs.
+
+[dependency-groups]
+dev = ["pytest"]
+
+# Flat modules, not an installable package — uv just resolves/installs deps.
+[tool.uv]
+package = false
