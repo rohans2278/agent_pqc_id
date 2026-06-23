@@ -12,8 +12,10 @@ class Settings(BaseSettings):
     aws_region: str
     kms_key_id: str
 
-    # Postgres
+    # Postgres — privileged connection (agent identity + audit + seeding).
     database_url: str
+    # Restricted read-only role for agent SQL queries (demo schema only).
+    query_database_url: str
 
     # Google Gemini (the agents' LLM)
     google_api_key: str

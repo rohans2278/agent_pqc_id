@@ -3,7 +3,7 @@
 Python backend for the PQC Agent ID simulation. Flat layout — these are plain modules, **not an installed package** (no `__init__.py`, no build backend). Run from the `backend/` directory so the modules import each other directly. Three concerns live here: the FastAPI app, the LangGraph + Gemini agent runtime, and the MCP server. Agents answer natural-language questions over a seeded demo SQL database; every tool call is signed with the agent's ML-DSA-65 key and verified against its registered public key before it runs.
 
 ## Layout (flat modules)
-- `config.py` — pydantic-settings, all config from env (`AWS_REGION`, `KMS_KEY_ID`, AWS creds, `DATABASE_URL`, `GOOGLE_API_KEY`)
+- `config.py` — pydantic-settings, all config from env (`AWS_REGION`, `KMS_KEY_ID`, AWS creds, `DATABASE_URL`, `QUERY_DATABASE_URL`, `GOOGLE_API_KEY`)
 - `db.py` — SQLAlchemy engine + session factory
 - `models.py` — `Agent`, `AuditLog` ORM models
 - `kms.py` — `envelope_encrypt()` / `envelope_decrypt()` (boto3 + AES-256-GCM)
@@ -31,7 +31,7 @@ Python backend for the PQC Agent ID simulation. Flat layout — these are plain 
 - **Never log, return, or persist a plaintext secret key or data key.** Decrypt the SK only inside `load_secret_key` / the signing path; overwrite/zero the bytes in a `finally` block immediately after signing.
 - **Verification uses the agent's *registered* public key** from the `agents` row — never a key derived from the SK being used to sign. This is what makes tamper detectable.
 - **Revocation is checked first**, before any KMS/crypto work, and returns `rejected_revoked`.
-- **All data access is read-only.** The SQL execution tool must run only `SELECT`s — enforce it (read-only transaction / statement check), never just trust the LLM. Reject anything that writes or mutates schema.
+- **All data access is read-only and isolated to the `demo` schema.** Agent SQL runs over `query_engine` (the restricted `agent_ro` role from `QUERY_DATABASE_URL`), which has `SELECT` only on `demo` and no privileges on `agents`/`audit_log`. Belt-and-suspenders in code too: single-statement `SELECT`/`WITH` only, inside a `READ ONLY` transaction. Never run agent SQL on the privileged connection.
 - New MCP tools must route through `signing.py` — never expose a tool that skips signature verification.
 - Keep `.env` out of git (already in `.gitignore`). Use `.env.example` for the contract.
 

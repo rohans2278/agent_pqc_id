@@ -5,29 +5,31 @@ or revoked agent is stopped before any query runs:
   - get_schema: list the demo tables/columns so the LLM can compose a query
   - run_sql:    execute a single read-only SELECT and return the rows
 
-Agents only ever see the `demo` schema. Reads are further constrained to a
-single SELECT/WITH statement inside a READ ONLY transaction.
-
-NOTE / known limitation: true isolation from the system tables (`agents`,
-`audit_log` in the `public` schema) wants a dedicated read-only Postgres role
-scoped to `demo`. That's a seed-phase decision; until then the search_path is
-pinned to `demo` and writes are blocked, but a schema-qualified read of `public`
-is not. See backend/CLAUDE.md.
+Isolation is enforced at the database, not just in code: data queries run over
+`query_engine`, a connection as the restricted `agent_ro` role (QUERY_DATABASE_URL)
+that has SELECT only on the `demo` schema and no privileges on the system tables
+(`public.agents` / `public.audit_log`). Reads are further constrained to a single
+SELECT/WITH statement inside a READ ONLY transaction. The privileged SessionLocal
+is used only for agent lookup and audit writes, never for agent-supplied SQL.
 """
 
 import json
 
 from mcp.server.fastmcp import Context, FastMCP
-from sqlalchemy import text
+from sqlalchemy import create_engine, text
 
 import signing
 from audit import write_audit_entry
-from db import SessionLocal, engine
+from config import settings
+from db import SessionLocal
 from models import EXECUTED
 
 DEMO_SCHEMA = "demo"
 MAX_ROWS = 100
 _READ_ONLY_START = ("select", "with")
+
+# Restricted, read-only connection for agent-supplied queries.
+query_engine = create_engine(settings.query_database_url, pool_pre_ping=True)
 
 mcp = FastMCP("pqc-agent-id", host="0.0.0.0", port=8001)
 
@@ -41,7 +43,7 @@ def _describe_schema() -> str:
         order by table_name, ordinal_position
         """
     )
-    with engine.connect() as conn:
+    with query_engine.connect() as conn:
         rows = conn.execute(sql, {"schema": DEMO_SCHEMA}).fetchall()
 
     tables: dict[str, list[str]] = {}
@@ -61,7 +63,7 @@ def _run_readonly(sql: str) -> str:
     if statement.split(None, 1)[0].lower() not in _READ_ONLY_START:
         raise ValueError("only read-only SELECT / WITH queries are allowed")
 
-    with engine.connect() as conn, conn.begin():
+    with query_engine.connect() as conn, conn.begin():
         # Defense in depth: block writes at the DB level and scope name
         # resolution to the demo schema. Must precede the query.
         conn.execute(text("SET TRANSACTION READ ONLY"))

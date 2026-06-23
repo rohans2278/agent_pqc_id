@@ -48,10 +48,3 @@ backend/      flat Python modules (see backend/CLAUDE.md)
   tests/        pytest suite
 frontend/     dashboard (later phase)
 ```
-
-## Setup
-
-1. Create an AWS KMS symmetric CMK; obtain a Google API key with the Gemini API enabled.
-2. Copy `.env.example` → `.env` and fill in `AWS_REGION`, `KMS_KEY_ID`, AWS credentials, `DATABASE_URL`, `GOOGLE_API_KEY`.
-3. `docker compose up` — starts Postgres (with the demo dataset seeded) and the backend.
-4. Run the test suite to exercise keygen, KMS, signing, revocation/tamper, and the agent's SQL access end-to-end.
