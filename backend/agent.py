@@ -14,7 +14,7 @@ from langgraph.prebuilt import create_react_agent
 
 from config import settings
 
-GEMINI_MODEL = "gemini-2.0-flash"
+GEMINI_MODEL = "gemini-2.5-flash"
 
 SYSTEM_PROMPT = (
     "You answer questions about a SQL database. First call get_schema to learn "

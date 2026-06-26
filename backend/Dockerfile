@@ -14,6 +14,7 @@ RUN git clone --depth 1 --branch 0.15.0 \
         https://github.com/open-quantum-safe/liboqs /tmp/liboqs \
     && cmake -S /tmp/liboqs -B /tmp/liboqs/build \
         -DBUILD_SHARED_LIBS=ON -DOQS_BUILD_ONLY_LIB=ON \
+        -DOQS_MINIMAL_BUILD="SIG_ml_dsa_65" \
     && cmake --build /tmp/liboqs/build --parallel \
     && cmake --install /tmp/liboqs/build \
     && ldconfig \

@@ -6,7 +6,7 @@ dependencies = [
     "fastapi",
     "uvicorn[standard]",
     "sqlalchemy>=2.0",
-    "psycopg2-binary",
+    "psycopg[binary]",
     "pydantic-settings",
     "boto3",
     "cryptography",
@@ -20,8 +20,12 @@ dependencies = [
 # library compiled first, which the Dockerfile handles before anything runs.
 
 [dependency-groups]
-dev = ["pytest"]
+dev = ["pytest", "httpx"]  # httpx backs FastAPI's TestClient
 
 # Flat modules, not an installable package — uv just resolves/installs deps.
 [tool.uv]
 package = false
+
+[tool.pytest.ini_options]
+pythonpath = ["."]   # flat modules import as `import config`, etc.
+testpaths = ["tests"]
