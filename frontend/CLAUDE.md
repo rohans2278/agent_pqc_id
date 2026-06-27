@@ -1,27 +1,33 @@
 # Frontend — CLAUDE.md
 
-Dashboard for the PQC Agent ID simulation. **This is a later phase — not built yet.** This file captures intent so work here stays consistent with the backend.
+Dashboard for the PQC Agent ID simulation: a single-page app over the FastAPI backend. Built incrementally, module by module. The frontend never sees secret keys — only agent ids, names, public keys, status, chat messages, and audit entries.
 
-## Purpose
-A management dashboard over the FastAPI backend:
-- **Create / delete agent** — issues an ML-DSA-65 keypair (backend handles keygen + KMS envelope encryption). Users manage a limited number of agents.
-- **Chat** — ask an agent a natural-language question and see its answer. The agent (LangGraph + Gemini) decides which read-only SQL tool to call; ideally surface the tool call(s) it made so the signed-access flow is visible.
-- **Tamper** button — calls the tamper endpoint to simulate a compromised agent; subsequent tool calls fail signature verification.
-- **Revoke** button — instantly blocks an agent.
-- **Audit view** — (ideally real-time) stream of tool calls with outcome `executed | rejected_signature | rejected_revoked`.
-- **Dataset view** — (optional) browse the seeded demo SQL dataset the agents query, so users can sanity-check answers.
+## Stack
+- **React 19 + Vite 6 + TypeScript** (SPA, talks to FastAPI over HTTP/JSON).
+- **Tailwind CSS v4** (`@tailwindcss/vite`, no `tailwind.config.js`) + **shadcn/ui** (new-york style, neutral base; components hand-added under `components/ui/`). Theme tokens live in `src/index.css`.
+- **lucide-react** icons. Data fetching is plain `fetch` wrapped in a typed client — no query library yet.
 
-## Stack (proposed — confirm before building)
-- React + Vite + TypeScript, talking to the FastAPI backend over HTTP/JSON.
-- Real-time audit via SSE or WebSocket (backend support TBD).
+## Layout
+- `src/lib/api.ts` — typed client for every endpoint the UI uses (list/get/create/delete/tamper/chat/audit). `VITE_API_BASE_URL` sets the backend URL (default `http://localhost:8000`). Revoke exists on the backend but is intentionally not surfaced.
+- `src/types.ts` — TS mirrors of the FastAPI response models (`Agent`, `AuditEntry`, `ChatResponse`).
+- `src/components/ui/` — shadcn primitives (`button`, `input`, `badge`, …).
+- `src/components/` — app components (`AgentRail`, and later the detail/chat/audit panels).
+- `src/App.tsx` — two-pane shell: left agent rail, right selected-agent detail.
+- `src/index.css` — Tailwind import + shadcn CSS variables (light/dark, plus a `--success` for audit greens).
+- `@/*` is aliased to `src/*` (in `tsconfig.json` and `vite.config.ts`).
 
-## Backend contract it consumes (see `backend/CLAUDE.md`)
-- `POST /agents`, `GET /agents`, `GET /agents/{id}`, `DELETE /agents/{id}`
-- `POST /agents/{id}/chat` — natural-language question in, agent answer out
-- `POST /agents/{id}/tamper`, `POST /agents/{id}/revoke`
-- `GET /audit`
+## UX / behaviour
+- **Left rail:** agents as little robot icons (`Bot`), with an inline create form. Click one to select it.
+- **Agent detail:** chat with the agent, plus **Tamper** and **Delete** buttons (no revoke in the UI).
+- **Security story is front and center:** the audit feed is color-coded (green `executed`, red `rejected_*`), and an agent is shown **COMPROMISED** when its recent audit contains `rejected_signature` — there is no "tampered" status on the backend, so the UI *infers* it.
+- **Chat is multi-turn:** the backend remembers per-agent history (`MemorySaver` keyed by `agent_id`), so follow-up questions work. Each request still sends only the new message.
+- **Audit is polled** (`GET /audit`) — the backend has no SSE/WebSocket.
 
 ## Conventions
-- The frontend never handles secret keys — it only sees agent ids, names, public keys, status, chat messages, and audit entries. All crypto stays server-side.
-- A tampered or revoked agent will return rejected chat/tool calls; surface the rejection outcome to the user rather than failing silently.
-- Keep API base URL and any keys in env (`.env.local`), never hard-coded; `node_modules/` and build output are gitignored.
+- All crypto stays server-side; the UI only renders identity/status/audit data.
+- Surface backend rejections (tampered/revoked → blocked calls, `502` on agent run failures) to the user rather than failing silently.
+- Keep the API base URL in env (`.env.local`), never hard-coded; `node_modules/` and build output are gitignored.
+
+## Running
+- `npm install`, then `npm run dev` (Vite dev server on **port 5173** — the origin the backend's CORS allows). `npm run build` runs `tsc --noEmit` then `vite build`.
+- The backend must be running (`docker compose up --build` in `backend/`) for the dashboard to load agents.
