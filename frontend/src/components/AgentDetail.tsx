@@ -1,18 +1,16 @@
 import { useState } from "react"
 import { Bot, ShieldAlert, Trash2 } from "lucide-react"
 
-import { AuditFeed } from "@/components/AuditFeed"
 import { ChatPanel } from "@/components/ChatPanel"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { api } from "@/lib/api"
 import { cn } from "@/lib/utils"
-import type { Agent, AuditEntry } from "@/types"
+import type { Agent } from "@/types"
 
 interface AgentDetailProps {
   agent: Agent
   compromised: boolean
-  auditEntries: AuditEntry[]
   onChanged: () => void // refresh after tamper
   onDeleted: () => void // clear selection + refresh
 }
@@ -20,7 +18,6 @@ interface AgentDetailProps {
 export function AgentDetail({
   agent,
   compromised,
-  auditEntries,
   onChanged,
   onDeleted,
 }: AgentDetailProps) {
@@ -131,12 +128,7 @@ export function AgentDetail({
         </p>
       )}
 
-      <div className="flex min-h-0 flex-1">
-        <ChatPanel agentId={agent.id} />
-        <aside className="w-80 shrink-0 border-l">
-          <AuditFeed entries={auditEntries} />
-        </aside>
-      </div>
+      <ChatPanel agentId={agent.id} />
     </div>
   )
 }

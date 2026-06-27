@@ -3,6 +3,7 @@ import { ShieldCheck } from "lucide-react"
 
 import { AgentDetail } from "@/components/AgentDetail"
 import { AgentRail } from "@/components/AgentRail"
+import { AuditFeed } from "@/components/AuditFeed"
 import { api } from "@/lib/api"
 import type { Agent, AuditEntry } from "@/types"
 
@@ -91,7 +92,6 @@ function App() {
               key={selected.id}
               agent={selected}
               compromised={compromisedIds.has(selected.id)}
-              auditEntries={audit.filter((e) => e.agent_id === selected.id)}
               onChanged={() => {
                 void refresh()
                 void refreshAudit()
@@ -107,6 +107,13 @@ function App() {
             </div>
           )}
         </main>
+        <aside className="w-80 shrink-0 border-l">
+          <AuditFeed
+            entries={audit}
+            agents={agents}
+            onSelectAgent={setSelectedId}
+          />
+        </aside>
       </div>
     </div>
   )
