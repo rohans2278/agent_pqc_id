@@ -3,7 +3,7 @@
 Python backend for the PQC Agent ID simulation. Flat layout — these are plain modules, **not an installed package** (no `__init__.py`, no build backend). Run from the `backend/` directory so the modules import each other directly. Three concerns live here: the FastAPI app, the LangGraph + Gemini agent runtime, and the MCP server. Agents answer natural-language questions over a seeded demo SQL database; every tool call is signed with the agent's ML-DSA-65 key and verified against its registered public key before it runs.
 
 ## Layout (flat modules)
-- `config.py` — pydantic-settings, all config from env (`AWS_REGION`, `KMS_KEY_ID`, AWS creds, `DATABASE_URL`, `QUERY_DATABASE_URL`, `GOOGLE_API_KEY`)
+- `config.py` — pydantic-settings, all config from env (`AWS_REGION`, `KMS_KEY_ID`, AWS creds, `DATABASE_URL`, `QUERY_DATABASE_URL`, `GOOGLE_API_KEY`, `CORS_ORIGINS`)
 - `db.py` — SQLAlchemy engine + session factory
 - `models.py` — `Agent`, `AuditLog` ORM models
 - `kms.py` — `envelope_encrypt()` / `envelope_decrypt()` (boto3 + AES-256-GCM)
@@ -11,8 +11,8 @@ Python backend for the PQC Agent ID simulation. Flat layout — these are plain 
 - `keystore.py` — `create_keypair_for_agent()`, `load_secret_key()`, `tamper_agent()`
 - `audit.py` — `write_audit_entry()`
 - `bootstrap.py` — startup: `create_all()` for the ORM tables, then run the demo `seed/*.sql` files
-- `api.py` — FastAPI app: agent CRUD, `chat`, `tamper`, `revoke`, audit query
-- `agent.py` — LangGraph graph driving Gemini; connects to the MCP server as a client. The `chat` endpoint invokes this.
+- `api.py` — FastAPI app: agent CRUD, `chat`, `tamper`, `revoke`, audit query; CORS for the dashboard origin (`CORS_ORIGINS`)
+- `agent.py` — LangGraph ReAct agent (Gemini 2.5 Flash) + MCP client. Keeps per-agent conversation memory (`MemorySaver` keyed by `agent_id`) for multi-turn chat, and a system prompt scopes it to read-only questions about the database *contents* — it refuses off-topic requests and any instruction to modify data/infrastructure.
 - `mcp_server.py` — MCP server; read-only SQL tools (schema introspection + `SELECT` execution)
 - `signing.py` — interception middleware: revocation check → load SK → sign → verify → execute → audit
 - `seed/` — plain folder of `.sql` files only (demo dataset schema + rows). **No `__init__.py`** — not a Python package. The bootstrap step runs these on startup, after `create_all()`.
@@ -43,6 +43,7 @@ Python backend for the PQC Agent ID simulation. Flat layout — these are plain 
 - `agent_id` is passed with every MCP tool call; the middleware looks up that agent's SK/PK from Postgres.
 - Every tool call writes exactly one `audit_log` row with `outcome` ∈ `executed | rejected_signature | rejected_revoked`.
 - The demo dataset is fixed and seeded from `seed/`; give the agent a schema-introspection tool so Gemini can discover tables/columns before composing a query.
+- Chat is multi-turn via an **in-process** `MemorySaver` keyed by `agent_id` (history is lost on restart, fine for the simulation). The guardrail is the system prompt **plus** the read-only `agent_ro` role — defense in depth, never just the prompt.
 
 ## Running & testing
 - Built and run via Docker Compose (liboqs builds cleanly in the Linux container; native Windows is not supported). Dependencies install with uv from `pyproject.toml`.

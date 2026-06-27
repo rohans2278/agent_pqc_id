@@ -23,5 +23,8 @@ class Settings(BaseSettings):
     # Where the agent (MCP client) reaches the MCP server.
     mcp_server_url: str = "http://localhost:8001/mcp"
 
+    # Browser origins allowed to call the API (the Vite dev server by default).
+    cors_origins: list[str] = ["http://localhost:5173"]
+
 
 settings = Settings()

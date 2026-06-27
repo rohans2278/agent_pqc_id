@@ -11,12 +11,14 @@ from contextlib import asynccontextmanager
 from datetime import datetime
 
 from fastapi import Depends, FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 import agent as agent_runtime
 from bootstrap import init_db
+from config import settings
 from db import get_db
 from keystore import create_keypair_for_agent, tamper_agent
 from models import REVOKED, Agent, AuditLog
@@ -33,6 +35,13 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="PQC Agent ID", lifespan=lifespan)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=settings.cors_origins,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 
 # --- schemas ---------------------------------------------------------------
