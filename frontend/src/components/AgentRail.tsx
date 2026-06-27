@@ -10,6 +10,7 @@ import type { Agent } from "@/types"
 interface AgentRailProps {
   agents: Agent[]
   selectedId: string | null
+  compromisedIds: Set<string>
   onSelect: (id: string) => void
   onCreated: (agent: Agent) => void
 }
@@ -17,6 +18,7 @@ interface AgentRailProps {
 export function AgentRail({
   agents,
   selectedId,
+  compromisedIds,
   onSelect,
   onCreated,
 }: AgentRailProps) {
@@ -69,20 +71,34 @@ export function AgentRail({
           </p>
         ) : (
           <ul className="space-y-1">
-            {agents.map((agent) => (
-              <li key={agent.id}>
-                <button
-                  onClick={() => onSelect(agent.id)}
-                  className={cn(
-                    "flex w-full items-center gap-2.5 rounded-md px-2 py-2 text-left text-sm transition-colors hover:bg-accent",
-                    selectedId === agent.id && "bg-accent",
-                  )}
-                >
-                  <Bot className="size-5 shrink-0 text-muted-foreground" />
-                  <span className="min-w-0 flex-1 truncate">{agent.name}</span>
-                </button>
-              </li>
-            ))}
+            {agents.map((agent) => {
+              const compromised = compromisedIds.has(agent.id)
+              return (
+                <li key={agent.id}>
+                  <button
+                    onClick={() => onSelect(agent.id)}
+                    className={cn(
+                      "flex w-full items-center gap-2.5 rounded-md px-2 py-2 text-left text-sm transition-colors hover:bg-accent",
+                      selectedId === agent.id && "bg-accent",
+                    )}
+                  >
+                    <Bot
+                      className={cn(
+                        "size-5 shrink-0",
+                        compromised ? "text-destructive" : "text-muted-foreground",
+                      )}
+                    />
+                    <span className="min-w-0 flex-1 truncate">{agent.name}</span>
+                    {compromised && (
+                      <span
+                        className="size-2 shrink-0 rounded-full bg-destructive"
+                        title="compromised — signatures no longer verify"
+                      />
+                    )}
+                  </button>
+                </li>
+              )
+            })}
           </ul>
         )}
       </div>

@@ -1,12 +1,15 @@
-import { useCallback, useEffect, useState } from "react"
+import { useCallback, useEffect, useMemo, useState } from "react"
 
 import { AgentDetail } from "@/components/AgentDetail"
 import { AgentRail } from "@/components/AgentRail"
 import { api } from "@/lib/api"
-import type { Agent } from "@/types"
+import type { Agent, AuditEntry } from "@/types"
+
+const AUDIT_POLL_MS = 2000
 
 function App() {
   const [agents, setAgents] = useState<Agent[]>([])
+  const [audit, setAudit] = useState<AuditEntry[]>([])
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
 
@@ -19,9 +22,35 @@ function App() {
     }
   }, [])
 
+  const refreshAudit = useCallback(async () => {
+    try {
+      setAudit(await api.audit())
+    } catch {
+      // transient poll failure; keep the last snapshot
+    }
+  }, [])
+
   useEffect(() => {
     void refresh()
   }, [refresh])
+
+  // Poll the audit log so the feed and compromised state stay live.
+  useEffect(() => {
+    void refreshAudit()
+    const id = setInterval(() => void refreshAudit(), AUDIT_POLL_MS)
+    return () => clearInterval(id)
+  }, [refreshAudit])
+
+  // An agent is "compromised" once any of its signed calls fails verification.
+  const compromisedIds = useMemo(
+    () =>
+      new Set(
+        audit
+          .filter((e) => e.outcome === "rejected_signature")
+          .map((e) => e.agent_id),
+      ),
+    [audit],
+  )
 
   const selected = agents.find((a) => a.id === selectedId) ?? null
 
@@ -46,6 +75,7 @@ function App() {
         <AgentRail
           agents={agents}
           selectedId={selectedId}
+          compromisedIds={compromisedIds}
           onSelect={setSelectedId}
           onCreated={async (agent) => {
             await refresh()
@@ -57,7 +87,12 @@ function App() {
             <AgentDetail
               key={selected.id}
               agent={selected}
-              onChanged={() => void refresh()}
+              compromised={compromisedIds.has(selected.id)}
+              auditEntries={audit.filter((e) => e.agent_id === selected.id)}
+              onChanged={() => {
+                void refresh()
+                void refreshAudit()
+              }}
               onDeleted={() => {
                 setSelectedId(null)
                 void refresh()

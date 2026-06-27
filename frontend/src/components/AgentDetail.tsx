@@ -1,19 +1,29 @@
 import { useState } from "react"
 import { Bot, ShieldAlert, Trash2 } from "lucide-react"
 
+import { AuditFeed } from "@/components/AuditFeed"
 import { ChatPanel } from "@/components/ChatPanel"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { api } from "@/lib/api"
-import type { Agent } from "@/types"
+import { cn } from "@/lib/utils"
+import type { Agent, AuditEntry } from "@/types"
 
 interface AgentDetailProps {
   agent: Agent
+  compromised: boolean
+  auditEntries: AuditEntry[]
   onChanged: () => void // refresh after tamper
   onDeleted: () => void // clear selection + refresh
 }
 
-export function AgentDetail({ agent, onChanged, onDeleted }: AgentDetailProps) {
+export function AgentDetail({
+  agent,
+  compromised,
+  auditEntries,
+  onChanged,
+  onDeleted,
+}: AgentDetailProps) {
   const [busy, setBusy] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [notice, setNotice] = useState<string | null>(null)
@@ -26,7 +36,7 @@ export function AgentDetail({ agent, onChanged, onDeleted }: AgentDetailProps) {
     try {
       await api.tamperAgent(agent.id)
       setNotice(
-        "Agent tampered — its stored key no longer matches its identity, so its signed tool calls will be rejected.",
+        "Agent tampered — its stored key no longer matches its identity. Ask it something to see its signed calls get rejected.",
       )
       onChanged()
     } catch (err) {
@@ -52,14 +62,26 @@ export function AgentDetail({ agent, onChanged, onDeleted }: AgentDetailProps) {
     <div className="flex h-full flex-col">
       <div className="flex items-start justify-between gap-4 border-b p-6">
         <div className="flex min-w-0 items-center gap-3">
-          <div className="grid size-10 shrink-0 place-items-center rounded-lg bg-accent">
-            <Bot className="size-6 text-muted-foreground" />
+          <div
+            className={cn(
+              "grid size-10 shrink-0 place-items-center rounded-lg",
+              compromised ? "bg-destructive/10" : "bg-accent",
+            )}
+          >
+            <Bot
+              className={cn(
+                "size-6",
+                compromised ? "text-destructive" : "text-muted-foreground",
+              )}
+            />
           </div>
           <div className="min-w-0">
             <div className="flex items-center gap-2">
               <h2 className="truncate text-xl font-semibold">{agent.name}</h2>
-              {agent.status === "revoked" && (
-                <Badge variant="destructive">revoked</Badge>
+              {compromised ? (
+                <Badge variant="destructive">COMPROMISED</Badge>
+              ) : (
+                <Badge variant="success">verified</Badge>
               )}
             </div>
             <p
@@ -102,16 +124,19 @@ export function AgentDetail({ agent, onChanged, onDeleted }: AgentDetailProps) {
         </div>
       </div>
 
-      {notice && (
-        <p className="border-b bg-accent px-6 py-2 text-sm">{notice}</p>
-      )}
+      {notice && <p className="border-b bg-accent px-6 py-2 text-sm">{notice}</p>}
       {error && (
         <p className="border-b bg-destructive/10 px-6 py-2 text-sm text-destructive">
           {error}
         </p>
       )}
 
-      <ChatPanel agentId={agent.id} />
+      <div className="flex min-h-0 flex-1">
+        <ChatPanel agentId={agent.id} />
+        <aside className="w-80 shrink-0 border-l">
+          <AuditFeed entries={auditEntries} />
+        </aside>
+      </div>
     </div>
   )
 }
