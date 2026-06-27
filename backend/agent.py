@@ -15,7 +15,7 @@ from langgraph.prebuilt import create_react_agent
 
 from config import settings
 
-GEMINI_MODEL = "gemini-2.5-flash"
+GEMINI_MODEL = "gemini-2.5-flash-lite"
 
 SYSTEM_PROMPT = (
     "You are a read-only assistant for a single SQL database. You may ONLY help "
@@ -50,6 +50,22 @@ def _client(agent_id: uuid.UUID) -> MultiServerMCPClient:
     )
 
 
+def _final_text(content: object) -> str:
+    """Gemini may return the final message content as a list of parts (each a
+    dict with a 'text' field) rather than a plain string. Pull the text out."""
+    if isinstance(content, str):
+        return content
+    if isinstance(content, list):
+        texts = [
+            p["text"]
+            for p in content
+            if isinstance(p, dict) and isinstance(p.get("text"), str)
+        ] or [p for p in content if isinstance(p, str)]
+        if texts:
+            return "".join(texts).strip()
+    return str(content)
+
+
 async def answer(agent_id: uuid.UUID, question: str) -> str:
     """Run the agent for one question and return its final natural-language reply."""
     tools = await _client(agent_id).get_tools()
@@ -66,5 +82,4 @@ async def answer(agent_id: uuid.UUID, question: str) -> str:
         {"messages": [{"role": "user", "content": question}]},
         config={"configurable": {"thread_id": str(agent_id)}},
     )
-    content = result["messages"][-1].content
-    return content if isinstance(content, str) else str(content)
+    return _final_text(result["messages"][-1].content)
