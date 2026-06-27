@@ -15,7 +15,17 @@ from langgraph.prebuilt import create_react_agent
 
 from config import settings
 
-GEMINI_MODEL = "gemini-2.5-flash-lite"
+GEMINI_MODEL = "gemini-2.5-flash"
+
+# Shown only if the model produces no text twice in a row — never an empty bubble.
+_EMPTY_FALLBACK = (
+    "I couldn't put together an answer for that — please try rephrasing your question."
+)
+# Nudge used to re-prompt the same conversation when a turn comes back empty.
+_RETRY_NUDGE = (
+    "Please answer my previous question using the data. If a tool call was "
+    "rejected, tell me you couldn't access the data."
+)
 
 SYSTEM_PROMPT = (
     "You are a read-only assistant for a single SQL database. You may ONLY help "
@@ -70,7 +80,10 @@ async def answer(agent_id: uuid.UUID, question: str) -> str:
     """Run the agent for one question and return its final natural-language reply."""
     tools = await _client(agent_id).get_tools()
     llm = ChatGoogleGenerativeAI(
-        model=GEMINI_MODEL, google_api_key=settings.google_api_key
+        model=GEMINI_MODEL,
+        google_api_key=settings.google_api_key,
+        temperature=0,
+        max_output_tokens=2048,
     )
     graph = create_react_agent(
         llm, tools, prompt=SYSTEM_PROMPT, checkpointer=_checkpointer
@@ -78,8 +91,18 @@ async def answer(agent_id: uuid.UUID, question: str) -> str:
 
     # thread_id = agent_id ties this turn to the agent's ongoing conversation;
     # the checkpointer supplies the prior messages, so we send only the new one.
-    result = await graph.ainvoke(
-        {"messages": [{"role": "user", "content": question}]},
-        config={"configurable": {"thread_id": str(agent_id)}},
-    )
-    return _final_text(result["messages"][-1].content)
+    config = {"configurable": {"thread_id": str(agent_id)}}
+
+    async def run(message: str) -> str:
+        result = await graph.ainvoke(
+            {"messages": [{"role": "user", "content": message}]}, config=config
+        )
+        return _final_text(result["messages"][-1].content)
+
+    # The model occasionally emits an empty final turn. Re-prompt the same
+    # conversation once to coax out the answer text; only then give up gracefully,
+    # so the user never sees an empty reply.
+    text = await run(question)
+    if not text:
+        text = await run(_RETRY_NUDGE)
+    return text or _EMPTY_FALLBACK
