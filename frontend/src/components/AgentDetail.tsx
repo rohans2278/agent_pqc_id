@@ -1,6 +1,7 @@
 import { useState } from "react"
 import { Bot, ShieldAlert, Trash2 } from "lucide-react"
 
+import { ChatPanel } from "@/components/ChatPanel"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { api } from "@/lib/api"
@@ -110,9 +111,7 @@ export function AgentDetail({ agent, onChanged, onDeleted }: AgentDetailProps) {
         </p>
       )}
 
-      <div className="grid flex-1 place-items-center text-sm text-muted-foreground">
-        Chat and audit arrive in the next modules.
-      </div>
+      <ChatPanel agentId={agent.id} />
     </div>
   )
 }
