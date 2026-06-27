@@ -17,6 +17,7 @@ Dashboard for the PQC Agent ID simulation: a single-page app over the FastAPI ba
 - `@/*` is aliased to `src/*` (in `tsconfig.json` and `vite.config.ts`).
 
 ## UX / behaviour
+- **Session-scoped view:** the dashboard shows only what's created in the current browser session — the agent rail and audit feed start **empty on every load** and populate as you create agents and chat. A reload resets the view; backend state in Postgres (the `agents` and `audit_log` rows) is left untouched. `App.tsx` builds its agent list from create responses (no list fetch on mount) and filters the global `GET /audit` poll down to the session's agents.
 - **Left rail:** agents as little robot icons (`Bot`), with an inline create form. Click one to select it.
 - **Agent detail:** chat with the agent, plus **Tamper** and **Delete** buttons (no revoke in the UI).
 - **Security story is front and center:** the audit feed is color-coded (green `executed`, red `rejected_*`), and an agent is shown **COMPROMISED** when its recent audit contains `rejected_signature` — there is no "tampered" status on the backend, so the UI *infers* it.

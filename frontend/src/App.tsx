@@ -10,19 +10,12 @@ import type { Agent, AuditEntry } from "@/types"
 const AUDIT_POLL_MS = 2000
 
 function App() {
+  // The dashboard is session-scoped: agents (and therefore the audit feed) start
+  // empty on every load and only show what's created in this browser session.
+  // Backend state in Postgres is untouched — a reload just resets this view.
   const [agents, setAgents] = useState<Agent[]>([])
   const [audit, setAudit] = useState<AuditEntry[]>([])
   const [selectedId, setSelectedId] = useState<string | null>(null)
-  const [error, setError] = useState<string | null>(null)
-
-  const refresh = useCallback(async () => {
-    try {
-      setAgents(await api.listAgents())
-      setError(null)
-    } catch (err) {
-      setError((err as Error).message)
-    }
-  }, [])
 
   const refreshAudit = useCallback(async () => {
     try {
@@ -32,10 +25,6 @@ function App() {
     }
   }, [])
 
-  useEffect(() => {
-    void refresh()
-  }, [refresh])
-
   // Poll the audit log so the feed and compromised state stay live.
   useEffect(() => {
     void refreshAudit()
@@ -43,15 +32,21 @@ function App() {
     return () => clearInterval(id)
   }, [refreshAudit])
 
+  // Scope the global audit log to this session's agents only.
+  const sessionAudit = useMemo(() => {
+    const ids = new Set(agents.map((a) => a.id))
+    return audit.filter((e) => ids.has(e.agent_id))
+  }, [audit, agents])
+
   // An agent is "compromised" once any of its signed calls fails verification.
   const compromisedIds = useMemo(
     () =>
       new Set(
-        audit
+        sessionAudit
           .filter((e) => e.outcome === "rejected_signature")
           .map((e) => e.agent_id),
       ),
-    [audit],
+    [sessionAudit],
   )
 
   const selected = agents.find((a) => a.id === selectedId) ?? null
@@ -69,20 +64,14 @@ function App() {
         </div>
       </header>
 
-      {error && (
-        <p className="border-b bg-destructive/10 px-6 py-2 text-sm text-destructive">
-          {error}
-        </p>
-      )}
-
       <div className="flex min-h-0 flex-1">
         <AgentRail
           agents={agents}
           selectedId={selectedId}
           compromisedIds={compromisedIds}
           onSelect={setSelectedId}
-          onCreated={async (agent) => {
-            await refresh()
+          onCreated={(agent) => {
+            setAgents((prev) => [...prev, agent])
             setSelectedId(agent.id)
           }}
         />
@@ -92,13 +81,10 @@ function App() {
               key={selected.id}
               agent={selected}
               compromised={compromisedIds.has(selected.id)}
-              onChanged={() => {
-                void refresh()
-                void refreshAudit()
-              }}
+              onChanged={() => void refreshAudit()}
               onDeleted={() => {
+                setAgents((prev) => prev.filter((a) => a.id !== selected.id))
                 setSelectedId(null)
-                void refresh()
               }}
             />
           ) : (
@@ -109,7 +95,7 @@ function App() {
         </main>
         <aside className="w-80 shrink-0 border-l">
           <AuditFeed
-            entries={audit}
+            entries={sessionAudit}
             agents={agents}
             onSelectAgent={setSelectedId}
           />
