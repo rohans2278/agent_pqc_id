@@ -5,6 +5,7 @@ signed MCP tools. This API manages agent identities and surfaces the audit log.
 """
 
 import base64
+import logging
 import uuid
 from contextlib import asynccontextmanager
 from datetime import datetime
@@ -21,6 +22,8 @@ from keystore import create_keypair_for_agent, tamper_agent
 from models import REVOKED, Agent, AuditLog
 
 MAX_AGENTS = 10
+
+logger = logging.getLogger("pqc.api")
 
 
 @asynccontextmanager
@@ -134,7 +137,15 @@ def revoke(agent_id: uuid.UUID, db: Session = Depends(get_db)):
 @app.post("/agents/{agent_id}/chat", response_model=ChatResponse)
 async def chat(agent_id: uuid.UUID, body: ChatRequest, db: Session = Depends(get_db)):
     _get_or_404(db, agent_id)  # 404 fast; tamper/revoke are enforced at the tool layer
-    answer = await agent_runtime.answer(agent_id, body.message)
+    try:
+        answer = await agent_runtime.answer(agent_id, body.message)
+    except Exception as exc:
+        # Upstream failure (Gemini quota/auth, MCP unreachable, etc.). Log the
+        # detail server-side; return a clean error without leaking internals.
+        logger.exception("agent run failed for %s", agent_id)
+        raise HTTPException(
+            status_code=502, detail=f"agent run failed: {type(exc).__name__}"
+        ) from exc
     return ChatResponse(answer=answer)
 
 

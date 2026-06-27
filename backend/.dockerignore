@@ -1,0 +1,10 @@
+# Secrets — never copy into the image (runtime gets them via env_file instead)
+.env
+
+# Python caches and local virtualenv
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/

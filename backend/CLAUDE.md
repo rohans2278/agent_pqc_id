@@ -17,8 +17,10 @@ Python backend for the PQC Agent ID simulation. Flat layout — these are plain 
 - `signing.py` — interception middleware: revocation check → load SK → sign → verify → execute → audit
 - `seed/` — plain folder of `.sql` files only (demo dataset schema + rows). **No `__init__.py`** — not a Python package. The bootstrap step runs these on startup, after `create_all()`.
 - `tests/` — pytest
-- `pyproject.toml` — `[project]` dependencies only, installed with **uv** (no setuptools/poetry, no build backend)
-- `Dockerfile` — builds liboqs and provides the runtime image (shared by both services)
+- `pyproject.toml` — `[project]` dependencies only, installed with **uv** (no setuptools/poetry, no build backend); `psycopg` v3 driver
+- `Dockerfile` — builds a minimal liboqs (`OQS_MINIMAL_BUILD=SIG_ml_dsa_65`) + the pinned `oqs` binding; provides the runtime image (shared by both services)
+- `docker-compose.yml` — Postgres + the two services (`api` builds the image, `mcp` reuses it)
+- `.dockerignore` — keeps `.env`, caches, and the venv out of the build context
 
 ## How a request flows
 1. User hits the FastAPI `chat` endpoint with an `agent_id` and a natural-language question.
@@ -33,7 +35,7 @@ Python backend for the PQC Agent ID simulation. Flat layout — these are plain 
 - **Revocation is checked first**, before any KMS/crypto work, and returns `rejected_revoked`.
 - **All data access is read-only and isolated to the `demo` schema.** Agent SQL runs over `query_engine` (the restricted `agent_ro` role from `QUERY_DATABASE_URL`), which has `SELECT` only on `demo` and no privileges on `agents`/`audit_log`. Belt-and-suspenders in code too: single-statement `SELECT`/`WITH` only, inside a `READ ONLY` transaction. Never run agent SQL on the privileged connection.
 - New MCP tools must route through `signing.py` — never expose a tool that skips signature verification.
-- Keep `.env` out of git (already in `.gitignore`). Use `.env.example` for the contract.
+- Keep `.env` out of git (in `.gitignore`) **and out of the image** (in `.dockerignore`); the container receives secrets at runtime via `env_file`, never baked into a layer. Use `.env.example` for the contract.
 
 ## Conventions
 - ML-DSA mechanism name is `"ML-DSA-65"`; on import assert it's in `oqs.get_enabled_sig_mechanisms()` (older liboqs exposes `"Dilithium3"` — fail loudly with guidance rather than silently picking the wrong one).
@@ -45,5 +47,7 @@ Python backend for the PQC Agent ID simulation. Flat layout — these are plain 
 ## Running & testing
 - Built and run via Docker Compose (liboqs builds cleanly in the Linux container; native Windows is not supported). Dependencies install with uv from `pyproject.toml`.
 - **One image, two services.** `docker-compose.yml` runs two startup commands from the same image: `uvicorn` for the FastAPI app on **port 8000**, and `python mcp_server.py` for the MCP server on **port 8001**.
-- `test_kms.py` hits **real** AWS KMS and the agent tests hit the **real** Gemini API — they need valid credentials in the environment.
-- Prefer running the full suite inside the container so the liboqs build matches.
+- `test_kms.py` hits **real** AWS KMS and `test_e2e.py` hits the **real** Gemini API — they need valid credentials in `.env`.
+- The image installs runtime deps only (`uv sync --no-dev`). Run the suite in the container, adding the dev deps ad-hoc so the separately-installed `oqs` isn't disturbed:
+  `docker compose run --rm api sh -c "uv pip install -q pytest httpx && pytest"`
+- `test_e2e.py` needs the MCP server up (it runs as a compose service) and a Gemini key; it auto-skips if the MCP port is closed.
