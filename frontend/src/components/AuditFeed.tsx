@@ -7,6 +7,12 @@ const OUTCOME_STYLE: Record<AuditOutcome, string> = {
   rejected_revoked: "text-destructive",
 }
 
+const OUTCOME_DOT: Record<AuditOutcome, string> = {
+  executed: "bg-success",
+  rejected_signature: "bg-destructive",
+  rejected_revoked: "bg-destructive",
+}
+
 export function AuditFeed({ entries }: { entries: AuditEntry[] }) {
   return (
     <div className="flex h-full flex-col">
@@ -29,7 +35,15 @@ export function AuditFeed({ entries }: { entries: AuditEntry[] }) {
                 className="rounded-md px-2 py-1.5 text-xs hover:bg-accent"
               >
                 <div className="flex items-center justify-between gap-2">
-                  <span className="font-mono">{entry.tool}</span>
+                  <span className="flex items-center gap-1.5 font-mono">
+                    <span
+                      className={cn(
+                        "size-1.5 shrink-0 rounded-full",
+                        OUTCOME_DOT[entry.outcome],
+                      )}
+                    />
+                    {entry.tool}
+                  </span>
                   <span
                     className={cn("font-medium", OUTCOME_STYLE[entry.outcome])}
                   >

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react"
+import { ShieldCheck } from "lucide-react"
 
 import { AgentDetail } from "@/components/AgentDetail"
 import { AgentRail } from "@/components/AgentRail"
@@ -57,8 +58,10 @@ function App() {
   return (
     <div className="flex h-screen flex-col bg-background text-foreground">
       <header className="border-b">
-        <div className="flex items-center gap-2 px-6 py-3">
+        <div className="flex items-center gap-2.5 px-6 py-3">
+          <ShieldCheck className="size-5 text-primary" />
           <h1 className="text-lg font-semibold">PQC Agent ID</h1>
+          <span className="text-muted-foreground">·</span>
           <span className="text-sm text-muted-foreground">
             Post-quantum identity for AI agents
           </span>

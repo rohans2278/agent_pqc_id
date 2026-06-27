@@ -1,5 +1,5 @@
 import { type FormEvent, useEffect, useRef, useState } from "react"
-import { Send } from "lucide-react"
+import { MessageSquare, Send } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -56,10 +56,15 @@ export function ChatPanel({ agentId }: { agentId: string }) {
     <div className="flex min-h-0 flex-1 flex-col">
       <div className="flex-1 overflow-y-auto p-6">
         {messages.length === 0 ? (
-          <p className="grid h-full place-items-center text-center text-sm text-muted-foreground">
-            Ask this agent about the database — e.g. “How many customers are
-            there?”
-          </p>
+          <div className="grid h-full place-items-center">
+            <div className="flex max-w-xs flex-col items-center gap-2 text-center text-sm text-muted-foreground">
+              <MessageSquare className="size-8 opacity-40" />
+              <p>
+                Ask this agent about the database — e.g. “How many customers are
+                there?”
+              </p>
+            </div>
+          </div>
         ) : (
           <div className="mx-auto flex max-w-2xl flex-col gap-3">
             {messages.map((m, i) => (

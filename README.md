@@ -4,6 +4,8 @@ A simulation of a **post-quantum cryptographic identity and access-control syste
 
 The agent never holds its own keys. The public key is the agent's registered identity in Postgres; the secret key is sealed with **AWS KMS envelope encryption** and only ever decrypted, briefly, inside the signing path. A **tamper** action swaps an agent's stored secret key for a random one to model a compromise — its signatures stop matching its registered public key, and every request it makes is rejected.
 
+A **React dashboard** ties it together: create agents, chat with them in natural language, hit **Tamper**, and watch the live audit feed flip the agent to **COMPROMISED** as its signed calls start failing verification.
+
 ## How it works
 
 - **Create an agent** — the backend generates an ML-DSA-65 keypair. The public key is stored as the agent's identity record (linked to its human-readable name); the secret key is envelope-encrypted under AWS KMS and stored as ciphertext.
@@ -23,6 +25,7 @@ The agent never holds its own keys. The public key is the agent's registered ide
 - **Instant revocation** — revoked agents are blocked before any crypto runs.
 - **Tamper simulation** — swaps an agent's signing key so its calls fail verification, modelling a compromised agent.
 - **Full audit log** — every tool call is recorded with its outcome.
+- **Dashboard** — a React/Vite UI to create agents, chat, tamper, and watch a live audit feed flag compromised agents in real time.
 
 ## Stack
 
@@ -32,6 +35,7 @@ The agent never holds its own keys. The public key is the agent's registered ide
 - **API:** FastAPI (agent CRUD, chat, tamper, revoke, audit)
 - **Tool layer:** MCP server (Python MCP SDK / FastMCP) + signing middleware
 - **Storage:** Postgres (agent identity, key material, audit log, and the seeded demo dataset)
+- **Frontend:** React + Vite + TypeScript, Tailwind CSS + shadcn/ui
 - **Runtime:** Docker Compose (the Linux container builds liboqs cleanly)
 
 ## Layout
@@ -46,5 +50,10 @@ backend/      flat Python modules (see backend/CLAUDE.md)
   config.py db.py models.py audit.py bootstrap.py
   seed/         demo dataset (.sql files, seeded on startup)
   tests/        pytest suite
-frontend/     dashboard (later phase)
+frontend/     React + Vite dashboard (see frontend/CLAUDE.md)
+  src/
+    App.tsx          two-pane shell (agent rail + agent detail)
+    components/       AgentRail, AgentDetail, ChatPanel, AuditFeed
+    lib/api.ts        typed client for the FastAPI backend
+    types.ts          shared response types
 ```
